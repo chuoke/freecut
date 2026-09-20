@@ -1,4 +1,4 @@
-# FreeCut headless render service.
+# FreeVideoEditor headless render service.
 #
 # Builds the harness (dist/) and runs serve.mjs with one warm headless Chrome.
 # Google Chrome (not Chromium) is used so H.264/AAC (proprietary codecs) work;

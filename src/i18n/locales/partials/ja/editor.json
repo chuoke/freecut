@@ -640,14 +640,14 @@
       "matchSize": "サイズを合わせる"
     },
     "editor": {
-      "appLabel": "FreeCut ビデオエディター",
+      "appLabel": "FreeVideoEditor ビデオエディター",
       "upgrading": "プロジェクトをアップグレード中…",
       "backupCreated": "アップグレード前にバックアップを作成しました",
       "backupFailed": "アップグレード前のバックアップ作成に失敗しました",
       "tryAgain": "もう一度お試しください。",
       "projectSaved": "プロジェクトを保存しました",
       "projectSaveFailed": "プロジェクトの保存に失敗しました",
-      "projectBundle": "FreeCut プロジェクトバンドル"
+      "projectBundle": "FreeVideoEditor プロジェクトバンドル"
     },
     "audioMeters": {
       "meters": "メーター",

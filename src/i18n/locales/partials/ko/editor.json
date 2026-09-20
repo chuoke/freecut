@@ -640,14 +640,14 @@
       "matchSize": "크기 맞추기"
     },
     "editor": {
-      "appLabel": "FreeCut 비디오 편집기",
+      "appLabel": "FreeVideoEditor 비디오 편집기",
       "upgrading": "프로젝트 업그레이드 중…",
       "backupCreated": "업그레이드 전 백업이 생성되었습니다",
       "backupFailed": "업그레이드 전 백업 생성에 실패했습니다",
       "tryAgain": "다시 시도하세요.",
       "projectSaved": "프로젝트가 저장되었습니다",
       "projectSaveFailed": "프로젝트 저장에 실패했습니다",
-      "projectBundle": "FreeCut 프로젝트 번들"
+      "projectBundle": "FreeVideoEditor 프로젝트 번들"
     },
     "audioMeters": {
       "meters": "미터",

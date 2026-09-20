@@ -71,7 +71,7 @@ export async function createHarnessServer({ distDir, resolveMedia = () => null, 
       if (!requireGetOrHead(req, res)) return
       const pathname = decodeRequestPath(req)
 
-      if (pathname === '/favicon.ico') {
+      if (pathname === '/favicon.png') {
         res.writeHead(204)
         res.end()
         return

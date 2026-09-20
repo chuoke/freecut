@@ -82,7 +82,11 @@ const mediaStoreState = vi.hoisted(() => ({
   showNotification: vi.fn(),
   markMediaBroken: vi.fn(),
   openMissingMediaDialog: vi.fn(),
-  analysisProgress: null as null | { total: number; completed: number; cancelRequested: boolean },
+  analysisProgress: null as null | {
+    total: number
+    completed: number
+    cancelRequested: boolean
+  },
   beginAnalysisRun: vi.fn(),
   incrementAnalysisCompleted: vi.fn(),
   requestAnalysisCancel: vi.fn(),
@@ -208,7 +212,11 @@ vi.mock('../services/media-transcription-runner', () => mediaTranscriptionRunner
 vi.mock('../services/subtitle-sidecar-service', () => ({
   subtitleSidecarService: subtitleSidecarServiceMocks,
   chooseEmbeddedSubtitleTrackForMedia: (
-    tracks: ReadonlyArray<{ trackNumber: number; default?: boolean; forced?: boolean }>,
+    tracks: ReadonlyArray<{
+      trackNumber: number
+      default?: boolean
+      forced?: boolean
+    }>,
   ) => tracks.find((t) => t.forced) ?? tracks.find((t) => t.default) ?? tracks[0] ?? null,
   getEmbeddedSubtitleTrackLabel: (track: { language?: string; name?: string }) =>
     track.name ?? track.language ?? 'Track',
@@ -531,7 +539,9 @@ describe('MediaCard', () => {
   })
 
   it('passes the live file handle into the cache scan', async () => {
-    const file = new File(['video-data'], 'movie.mkv', { type: 'video/x-matroska' })
+    const file = new File(['video-data'], 'movie.mkv', {
+      type: 'video/x-matroska',
+    })
     const requestPermission = vi.fn(async () => 'granted' as PermissionState)
     const getFile = vi.fn(async () => file)
     const media = makeMedia({
@@ -588,13 +598,15 @@ describe('MediaCard', () => {
     expect(mediaStoreState.openMissingMediaDialog).toHaveBeenCalledTimes(1)
     expect(mediaStoreState.showNotification).toHaveBeenCalledWith({
       type: 'error',
-      message: 'FreeCut needs permission to read "movie.mkv" before extracting subtitles.',
+      message: 'FreeVideoEditor needs permission to read "movie.mkv" before extracting subtitles.',
     })
   })
 
   it('surfaces NotReadableError from blob open without marking the media missing', async () => {
     const requestPermission = vi.fn(async () => 'granted' as PermissionState)
-    const notReadable = Object.assign(new Error('blob unreadable'), { name: 'NotReadableError' })
+    const notReadable = Object.assign(new Error('blob unreadable'), {
+      name: 'NotReadableError',
+    })
     const getFile = vi.fn(async () => {
       throw notReadable
     })
@@ -616,7 +628,7 @@ describe('MediaCard', () => {
       expect(mediaStoreState.showNotification).toHaveBeenCalledWith({
         type: 'error',
         message:
-          'FreeCut could not read "movie.mkv" right now. Close any app using it and try again.',
+          'FreeVideoEditor could not read "movie.mkv" right now. Close any app using it and try again.',
       })
     })
     expect(embeddedSubtitlePickerStoreMocks.open).not.toHaveBeenCalled()

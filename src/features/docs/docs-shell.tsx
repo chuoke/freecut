@@ -58,7 +58,7 @@ export function DocsShell({ children, currentSlug }: DocsShellProps) {
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/projects">Open FreeCut</Link>
+              <Link to="/projects">Open FreeVideoEditor</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/">Home</Link>
@@ -154,10 +154,10 @@ export function DocsHome() {
       <section className="rounded-lg border border-border bg-card p-6 sm:p-8">
         <div className="mb-4 flex items-center gap-2 text-primary">
           <BookOpen className="h-5 w-5" />
-          <span className="text-sm font-medium">FreeCut documentation</span>
+          <span className="text-sm font-medium">FreeVideoEditor documentation</span>
         </div>
         <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
-          FreeCut User Guide
+          FreeVideoEditor User Guide
         </h1>
         <p className="mt-4 max-w-3xl text-muted-foreground">
           Start with setup, workspaces, media import, timeline editing, and export. Use the
@@ -357,7 +357,11 @@ const NOTE_STYLES = {
     className: 'border-amber-500/30 bg-amber-500/5',
     iconClass: 'text-amber-500',
   },
-  info: { icon: Info, className: 'border-primary/30 bg-primary/5', iconClass: 'text-primary' },
+  info: {
+    icon: Info,
+    className: 'border-primary/30 bg-primary/5',
+    iconClass: 'text-primary',
+  },
 } as const
 
 function Note({ tone, text }: { tone: 'tip' | 'warning' | 'info'; text: string }) {

@@ -1,5 +1,5 @@
 ---
-name: FreeCut
+name: FreeVideoEditor
 description: A browser-based, local-first, multi-track video editor for pro editors.
 colors:
   background: "oklch(0.15 0 0)"
@@ -109,13 +109,13 @@ components:
     height: "36px"
 ---
 
-# Design System: FreeCut
+# Design System: FreeVideoEditor
 
 ## 1. Overview
 
 **Creative North Star: "The Quiet Instrument"**
 
-FreeCut is a precision tool that recedes. The visual system behaves like a
+FreeVideoEditor is a precision tool that recedes. The visual system behaves like a
 well-machined instrument in a darkened room: graphite panels, restrained chrome,
 no decoration that doesn't earn its pixels. The footage in the preview is the
 brightest, most saturated thing on the screen, and everything else is tuned to
@@ -138,6 +138,7 @@ legacy-NLE chrome (beveled gray toolbars, illegible 10px labels). Density here i
 high but always clean and scannable.
 
 **Key Characteristics:**
+
 - Dark-only, neutral graphite ramp; value carries hierarchy
 - One warm-orange signal color, used sparingly for active/playback/focus
 - Tonal layering, not shadows, for depth
@@ -150,18 +151,22 @@ A near-monochrome graphite ramp from `oklch(0.12)` to `oklch(0.95)`, lit by a
 single warm-orange signal and a small set of meaning-bearing clip/marker hues.
 
 ### Primary
+
 - **Signal Orange** (`oklch(0.68 0.19 45)`): The one accent. Playback state, the
   playhead, active controls, focus rings, the shape-clip color. Never decorative;
   it always means "this is live / active / where you are."
 
 ### Secondary
+
 - **Raised Graphite** (`oklch(0.22 0 0)`): Secondary surfaces and secondary
   buttons, one step up from panel background.
 - **Hover Graphite** (`oklch(0.24 0 0)`): Hover backgrounds and input borders.
 
 ### Tertiary (clip + marker semantics)
+
 These hues are functional, not decorative; each encodes a timeline item type or
 edit landmark and must keep its meaning.
+
 - **Video Slate-Blue** (`oklch(0.3991 0.0401 250)`): Video clips.
 - **Audio Violet** (`oklch(0.22 0.02 302)`): Audio clips.
 - **Image Blue** (`oklch(0.62 0.17 250)`): Image clips.
@@ -171,6 +176,7 @@ edit landmark and must keep its meaning.
 - **Marker Blue** (`oklch(0.65 0.2 250)`): Timeline markers.
 
 ### Neutral
+
 - **Canvas Black** (`oklch(0.15 0 0)`): App background.
 - **Timeline Floor** (`oklch(0.12 0 0)`): The darkest surface; the timeline well.
 - **Panel Header** (`oklch(0.14 0 0)`): Panel header bars, one step under panels.
@@ -182,6 +188,7 @@ edit landmark and must keep its meaning.
 - **Muted Ink** (`oklch(0.6 0 0)`): Secondary/disabled text and placeholders.
 
 ### Named Rules
+
 **The One Signal Rule.** Orange means active. Reserve `oklch(0.68 0.19 45)` for
 playback, the playhead, focus, and active/selected state. It should occupy a small
 fraction of any screen; the moment it decorates a static element it stops reading
@@ -208,6 +215,7 @@ was drawn for exactly this kind of dense technical UI. Hierarchy comes from weig
 and size, not from a second display face.
 
 ### Hierarchy
+
 - **Headline** (600, 1.25rem, 1.3): Dialog titles, major section headers. Slight
   negative tracking (`-0.01em`).
 - **Title** (600, 1rem, 1.4): Panel titles, card headers, primary labels.
@@ -217,6 +225,7 @@ and size, not from a second display face.
   any value an editor reads precisely.
 
 ### Named Rules
+
 **The Mono-For-Data Rule.** Every number an editor must read or compare (timecode,
 frame, FPS, resolution, dB) is set in IBM Plex Mono so digits align and don't jump
 width. Prose and labels stay in Plex Sans.
@@ -234,6 +243,7 @@ Shadows appear only on detached, floating layers (menus, dialogs) and as an
 optional accent glow, never as a default card lift.
 
 ### Shadow Vocabulary (sparing)
+
 - **Floating layer** (`box-shadow: 0 4px 24px oklch(0 0 0 / 0.5)`): Popovers,
   dropdowns, dialogs lifting off the panel plane.
 - **Signal glow** (`box-shadow: 0 0 12px oklch(0.68 0.19 45 / 0.3)`, utility
@@ -241,6 +251,7 @@ optional accent glow, never as a default card lift.
   a neutral lift.
 
 ### Named Rules
+
 **The Flat-By-Default Rule.** Panels and cards are flat at rest. If a surface needs
 to feel raised, raise its lightness one step before adding a shadow. Shadows are
 for things that genuinely float (menus, modals) and for the orange signal glow on
@@ -254,6 +265,7 @@ shadows or bevels. Corners are softly rounded (`6px` default), never pill-shaped
 never sharp.
 
 ### Buttons
+
 - **Shape:** Softly rounded (`6px`, `{rounded.md}`); default height `36px`, compact
   `32px`, large `40px`. Icon buttons are square (`36×36`).
 - **Primary:** Signal Orange fill (`{colors.primary}`) with near-black text
@@ -270,6 +282,7 @@ never sharp.
 - **Link:** Orange text, underline on hover.
 
 ### Cards / Containers
+
 - **Corner Style:** `8px` (`{rounded.lg}`) for cards, `6px` for inner controls.
 - **Background:** Panel Surface (`oklch(0.18 0 0)`); headers drop to Panel Header
   (`oklch(0.14 0 0)`).
@@ -279,6 +292,7 @@ never sharp.
 - **Internal Padding:** `12–16px` (`{spacing.md}`–`{spacing.lg}`).
 
 ### Inputs / Fields
+
 - **Style:** Transparent fill, 1px input border (`{colors.input}`), `6px` radius,
   `36px` height, `4px 12px` padding.
 - **Focus:** Border/ring shifts to a 1px orange ring (`{colors.ring}`); outline is
@@ -288,12 +302,14 @@ never sharp.
 - **Disabled:** 50% opacity, `not-allowed` cursor.
 
 ### Navigation / Panels
+
 - Panels use header bars at Panel Header value with a Title-weight label, body
   content on Panel Surface. Active tab/panel is marked with the orange signal
   (underline or text), hover with a Hover Graphite tint. Keyboard focus is always
   visible via the orange ring.
 
 ### Signature: Timeline Clips
+
 The timeline is the signature surface. Clips sit on the Timeline Floor
 (`oklch(0.12 0 0)`) and are colored by type via the meaning-bearing hues, each with
 a matching subtle top-to-bottom gradient (`.bg-video-gradient`, `.bg-audio-gradient`,
@@ -304,6 +320,7 @@ density and more color than the rest of the app because the color is data.
 ## 6. Do's and Don'ts
 
 ### Do:
+
 - **Do** keep orange (`oklch(0.68 0.19 45)`) for active/playback/focus only; treat
   it as a signal, not a brand splash.
 - **Do** separate surfaces by stepping the neutral ramp's lightness before reaching
@@ -315,6 +332,7 @@ density and more color than the rest of the app because the color is data.
 - **Do** let the preview/footage be the brightest, most saturated thing on screen.
 
 ### Don't:
+
 - **Don't** make it look like a consumer editor (CapCut/iMovie): no playful candy
   buttons, no emoji, no gamified flourishes, no pill-shaped buttons.
 - **Don't** drift toward a flashy SaaS dashboard: no gradient hero text, no

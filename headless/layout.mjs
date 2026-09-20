@@ -1,4 +1,4 @@
-// FreeCut headless layout-dump CLI.
+// FreeVideoEditor headless layout-dump CLI.
 //
 // Prints the COMPUTED on-canvas bounding box of every visible item at a given
 // frame, as JSON — WITHOUT rendering. It reuses the exact transform resolver
@@ -23,30 +23,35 @@
 //
 // Status/logs go to stderr; only the layout JSON goes to stdout, so it pipes
 // cleanly (e.g. `... | jq '.items[] | select(.type=="text")'`).
-import fs from 'node:fs'
-import path from 'node:path'
-import { parseArgs, chromeLaunchArgs } from './lib/cli.mjs'
-import { withHarnessPage } from './lib/page-session.mjs'
-import { startHarness, loadJobProject, resolveProjectMedia } from './lib/render-core.mjs'
+import fs from "node:fs";
+import path from "node:path";
+import { parseArgs, chromeLaunchArgs } from "./lib/cli.mjs";
+import { withHarnessPage } from "./lib/page-session.mjs";
+import {
+  startHarness,
+  loadJobProject,
+  resolveProjectMedia,
+} from "./lib/render-core.mjs";
 
 // CLI arg wiring; exercised end-to-end by headless/test.mjs
 // fallow-ignore-next-line complexity
 async function main() {
-  const args = parseArgs(process.argv.slice(2))
-  const workspace = args.workspace
-  if (!workspace) throw new Error('Missing --workspace <dir>')
-  if (!fs.existsSync(workspace)) throw new Error(`Workspace not found: ${workspace}`)
-  if (!args.project) throw new Error('Missing --project <id|project.json>')
+  const args = parseArgs(process.argv.slice(2));
+  const workspace = args.workspace;
+  if (!workspace) throw new Error("Missing --workspace <dir>");
+  if (!fs.existsSync(workspace))
+    throw new Error(`Workspace not found: ${workspace}`);
+  if (!args.project) throw new Error("Missing --project <id|project.json>");
 
-  const atSeconds = args.at !== undefined ? Number(args.at) : undefined
-  const frame = args.frame !== undefined ? Number(args.frame) : undefined
+  const atSeconds = args.at !== undefined ? Number(args.at) : undefined;
+  const frame = args.frame !== undefined ? Number(args.frame) : undefined;
 
   const { harnessUrl, mediaUrlOf, closeServers } = await startHarness({
     workspace,
-    devUrl: args['harness-url'],
+    devUrl: args["harness-url"],
     build: args.build,
-  })
-  console.error(`Harness: ${harnessUrl}`)
+  });
+  console.error(`Harness: ${harnessUrl}`);
 
   try {
     await withHarnessPage(
@@ -54,55 +59,73 @@ async function main() {
         harnessUrl,
         headless: !args.head,
         launchArgs: chromeLaunchArgs(),
-        ignoreConsoleError: (text) => text.includes('Video load error'),
+        ignoreConsoleError: (text) => text.includes("Video load error"),
       },
-      (page) => dumpLayoutToOutput(page, { args, workspace, mediaUrlOf, frame, atSeconds }),
-    )
+      (page) =>
+        dumpLayoutToOutput(page, {
+          args,
+          workspace,
+          mediaUrlOf,
+          frame,
+          atSeconds,
+        }),
+    );
   } finally {
-    await closeServers()
+    await closeServers();
   }
 }
 
 // One-shot layout driver; exercised end-to-end by headless/test.mjs
 // fallow-ignore-next-line complexity
-async function dumpLayoutToOutput(page, { args, workspace, mediaUrlOf, frame, atSeconds }) {
-  const { project } = loadJobProject(workspace, { project: args.project })
+async function dumpLayoutToOutput(
+  page,
+  { args, workspace, mediaUrlOf, frame, atSeconds },
+) {
+  const { project } = loadJobProject(workspace, { project: args.project });
   // Only metadata is used (source dimensions); URLs are never fetched here.
-  const { media, missing } = resolveProjectMedia(workspace, project, mediaUrlOf, null)
+  const { media, missing } = resolveProjectMedia(
+    workspace,
+    project,
+    mediaUrlOf,
+    null,
+  );
   if (missing.length > 0) {
     console.error(
-      `  NOTE: ${missing.length} media source(s) not on disk; their default size may be off: ${missing.join(', ')}`,
-    )
+      `  NOTE: ${missing.length} media source(s) not on disk; their default size may be off: ${missing.join(", ")}`,
+    );
   }
 
-  const layout = await page.evaluate((payload) => window.freecut.dumpLayout(payload), {
-    project,
-    media,
-    frame,
-    atSeconds,
-    strict: Boolean(args.strict),
-  })
+  const layout = await page.evaluate(
+    (payload) => window.freecut.dumpLayout(payload),
+    {
+      project,
+      media,
+      frame,
+      atSeconds,
+      strict: Boolean(args.strict),
+    },
+  );
   for (const w of layout.warnings ?? []) {
-    console.error(`  WARNING [${w.code ?? 'UNKNOWN'}]: ${w.message}`)
+    console.error(`  WARNING [${w.code ?? "UNKNOWN"}]: ${w.message}`);
   }
 
-  const json = JSON.stringify(layout, null, 2)
+  const json = JSON.stringify(layout, null, 2);
   if (args.out) {
-    const outPath = path.resolve(args.out)
-    fs.mkdirSync(path.dirname(outPath), { recursive: true })
-    fs.writeFileSync(outPath, json)
+    const outPath = path.resolve(args.out);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, json);
     console.error(
       `  Layout at frame ${layout.frame} (${layout.atSeconds.toFixed(3)}s): ${layout.items.length} item(s) -> ${outPath}`,
-    )
+    );
   } else {
     console.error(
       `  Layout at frame ${layout.frame} (${layout.atSeconds.toFixed(3)}s): ${layout.items.length} item(s)`,
-    )
-    console.log(json)
+    );
+    console.log(json);
   }
 }
 
 main().catch((e) => {
-  console.error('\nLayout dump failed:', e.message ?? e)
-  process.exit(1)
-})
+  console.error("\nLayout dump failed:", e.message ?? e);
+  process.exit(1);
+});

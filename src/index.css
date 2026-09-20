@@ -25,59 +25,58 @@ body.canvas-translate-cursor-not-allowed * {
 
 @layer base {
   :root {
-    /* Professional Video Editor Dark Theme - OKLCH Colors */
-    /* Inspired by Premiere Pro & DaVinci Resolve */
+    /* Cinema control room — cool mineral surfaces with a precise blue signal */
 
-    /* Base - Very dark, reduced eye strain */
-    --background: oklch(0.15 0 0); /* #262626 - Main canvas */
-    --foreground: oklch(0.95 0 0); /* #f2f2f2 - Primary text */
+    /* Base — a blue-tinted near-black canvas reduces glare without flattening depth */
+    --background: oklch(0.145 0.012 255);
+    --foreground: oklch(0.94 0.012 255);
 
-    /* Panels - Layered depth */
-    --card: oklch(0.18 0 0); /* #2e2e2e - Panel backgrounds */
-    --card-foreground: oklch(0.92 0 0); /* #ebebeb - Panel text */
+    /* Panels — luminance steps, rather than heavy borders, establish hierarchy */
+    --card: oklch(0.195 0.014 255);
+    --card-foreground: oklch(0.91 0.012 255);
 
-    --popover: oklch(0.16 0 0); /* #292929 - Dropdowns */
-    --popover-foreground: oklch(0.92 0 0);
+    --popover: oklch(0.225 0.016 255);
+    --popover-foreground: oklch(0.94 0.012 255);
 
-    /* Primary - Orange accent (playback, active states) */
-    --primary: oklch(0.68 0.19 45); /* #FF8C3A - Vibrant orange */
-    --primary-foreground: oklch(0.12 0 0); /* Dark text on primary */
+    /* Primary — an alloy blue that stays legible for controls and focus */
+    --primary: oklch(0.75 0.13 245);
+    --primary-foreground: oklch(0.17 0.02 255);
 
-    /* Secondary - Subtle panel variation */
-    --secondary: oklch(0.22 0 0); /* #383838 - Secondary surfaces */
-    --secondary-foreground: oklch(0.88 0 0);
+    /* Secondary — distinct enough from the canvas for low-emphasis actions */
+    --secondary: oklch(0.255 0.018 255);
+    --secondary-foreground: oklch(0.89 0.012 255);
 
-    /* Muted - Backgrounds and disabled states */
-    --muted: oklch(0.2 0 0); /* #333333 - Muted backgrounds */
-    --muted-foreground: oklch(0.6 0 0); /* #999999 - Muted text */
+    /* Muted — reserved for secondary copy and disabled controls */
+    --muted: oklch(0.225 0.014 255);
+    --muted-foreground: oklch(0.72 0.018 255);
 
-    /* Accent - Hover states and highlights */
-    --accent: oklch(0.24 0 0); /* #3d3d3d - Hover backgrounds */
-    --accent-foreground: oklch(0.95 0 0);
+    /* Accent — a restrained blue-slate hover surface */
+    --accent: oklch(0.29 0.024 250);
+    --accent-foreground: oklch(0.95 0.012 255);
 
-    /* Destructive - Red for delete/errors */
-    --destructive: oklch(0.58 0.22 25); /* #E53E3E - Error red */
-    --destructive-foreground: oklch(0.98 0 0);
+    /* Destructive — warm enough to remain unambiguous beside blue actions */
+    --destructive: oklch(0.65 0.19 28);
+    --destructive-foreground: oklch(0.17 0.02 28);
 
-    /* Borders - Subtle separators */
-    --border: oklch(0.25 0 0); /* #404040 - Borders */
-    --input: oklch(0.24 0 0); /* #3d3d3d - Input borders */
-    --ring: oklch(0.68 0.19 45); /* Orange focus ring */
+    /* Boundaries and focus — visible without becoming visual noise */
+    --border: oklch(0.33 0.018 255);
+    --input: oklch(0.31 0.02 255);
+    --ring: oklch(0.75 0.13 245);
 
-    /* Panel system - Layered depth */
-    --panel-bg: oklch(0.18 0 0); /* #2e2e2e - Panels */
-    --panel-header: oklch(0.14 0 0); /* #242424 - Panel headers */
-    --timeline-bg: oklch(0.12 0 0); /* #1f1f1f - Timeline darker */
+    /* Editor surfaces — the timeline stays the deepest plane for footage focus */
+    --panel-bg: oklch(0.195 0.014 255);
+    --panel-header: oklch(0.17 0.014 255);
+    --timeline-bg: oklch(0.12 0.012 255);
 
     /* Sidebar */
-    --sidebar: oklch(0.18 0 0);
-    --sidebar-foreground: oklch(0.92 0 0);
-    --sidebar-primary: oklch(0.68 0.19 45);
-    --sidebar-primary-foreground: oklch(0.12 0 0);
-    --sidebar-accent: oklch(0.22 0 0);
-    --sidebar-accent-foreground: oklch(0.92 0 0);
-    --sidebar-border: oklch(0.25 0 0);
-    --sidebar-ring: oklch(0.68 0.19 45);
+    --sidebar: oklch(0.17 0.014 255);
+    --sidebar-foreground: oklch(0.91 0.012 255);
+    --sidebar-primary: oklch(0.75 0.13 245);
+    --sidebar-primary-foreground: oklch(0.17 0.02 255);
+    --sidebar-accent: oklch(0.25 0.018 255);
+    --sidebar-accent-foreground: oklch(0.92 0.012 255);
+    --sidebar-border: oklch(0.3 0.018 255);
+    --sidebar-ring: oklch(0.75 0.13 245);
 
     --radius: 0.5rem;
   }
@@ -89,7 +88,8 @@ body.canvas-translate-cursor-not-allowed * {
   }
 
   *:focus-visible {
-    outline: none !important;
+    outline: 2px solid var(--ring) !important;
+    outline-offset: 2px;
     box-shadow: none !important;
     --tw-ring-shadow: none !important;
   }

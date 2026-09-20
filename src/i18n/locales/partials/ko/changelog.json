@@ -1,6 +1,6 @@
 {
   "changelog": {
-    "homeAria": "FreeCut 홈",
+    "homeAria": "FreeVideoEditor 홈",
     "backToHome": "홈으로 돌아가기",
     "releaseNotes": "릴리스 노트",
     "title": "FreeCut의 새로운 소식",
@@ -11,6 +11,6 @@
     "initialRelease": "최초 릴리스",
     "ctaTitle": "무언가 만들어 볼 준비가 되셨나요?",
     "ctaDescription": "FreeCut을 열고 최신 도구를 활용해 보세요.",
-    "openFreeCut": "FreeCut 열기"
+    "openFreeCut": "FreeVideoEditor 열기"
   }
 }

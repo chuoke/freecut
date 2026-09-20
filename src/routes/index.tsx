@@ -214,7 +214,7 @@ function LandingPage() {
             </span>
           </div>
 
-          <h1 className="mb-4 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+          <h1 className="mb-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
             <Trans
               i18nKey="projects.landing.heroTitle"
               components={{ accent: <span className="text-primary" /> }}

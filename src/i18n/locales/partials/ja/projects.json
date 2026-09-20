@@ -190,7 +190,7 @@
       "chooseDifferentFolder": "別のフォルダを選択",
       "reconnect": "再接続",
       "folderPermissionDenied": "権限が付与されませんでした。続行するにはフォルダーを選択し、読み書きアクセスを許可してください。",
-      "folderPickFailed": "FreeCut はそのフォルダーを開けませんでした。編集できる通常のフォルダーを選び、読み書きアクセスを許可してください。",
+      "folderPickFailed": "FreeVideoEditor はそのフォルダーを開けませんでした。編集できる通常のフォルダーを選び、読み書きアクセスを許可してください。",
       "reconnectPermissionDenied": "権限が拒否されました。ワークスペースを再接続するか、別のフォルダーを選択してください。"
     },
     "workspaceIndicator": {
@@ -272,7 +272,7 @@
       "ctaHeading": "編集を始める準備はできましたか？",
       "ctaSubheading": "さっそく数秒で最初のプロジェクトを作成しましょう。",
       "startEditing": "編集を始める",
-      "footer": "MITライセンス © {{year}} FreeCut",
+      "footer": "MITライセンス © {{year}} FreeVideoEditor",
       "showcase": {
         "timeline": {
           "title": "タイムライン編集",
@@ -557,7 +557,7 @@
     },
     "routeError": {
       "title": "問題が発生しました",
-      "description": "FreeCut はこのページの読み込みを完了できませんでした。",
+      "description": "FreeVideoEditor はこのページの読み込みを完了できませんでした。",
       "projectNotFoundTitle": "このプロジェクトが見つかりません",
       "projectNotFoundDescription": "移動または削除されたか、古いリンクから開かれた可能性があります。他のプロジェクトは引き続きワークスペースで利用できます。",
       "backToProjects": "プロジェクト一覧に戻る",
@@ -565,9 +565,9 @@
       "copyDetails": "エラーの詳細をコピー",
       "detailsCopied": "エラーの詳細をコピーしました",
       "copyFailed": "詳細をコピーできませんでした",
-      "causePermission": "FreeCut はワークスペースフォルダーを使用する権限を失いました。再接続するか、別のフォルダーを選択してください。",
+      "causePermission": "FreeVideoEditor はワークスペースフォルダーを使用する権限を失いました。再接続するか、別のフォルダーを選択してください。",
       "causeMissing": "ワークスペースフォルダーが見つかりません。移動、名前の変更、または削除された可能性があります。",
-      "causeUnsupported": "ワークスペースフォルダーは、FreeCut に必要な機能をすべてサポートしていないドライブ上にあります。クラウド同期フォルダーやネットワークフォルダーではよくあることです。ローカルディスク上のフォルダーを選ぶと、たいていは解決します。"
+      "causeUnsupported": "ワークスペースフォルダーは、FreeVideoEditor に必要な機能をすべてサポートしていないドライブ上にあります。クラウド同期フォルダーやネットワークフォルダーではよくあることです。ローカルディスク上のフォルダーを選ぶと、たいていは解決します。"
     }
   }
 }

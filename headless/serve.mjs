@@ -1,4 +1,4 @@
-// FreeCut headless render service.
+// FreeVideoEditor headless render service.
 //
 // Launches one warm headless Chrome + harness over a workspace and exposes a
 // small HTTP API, so renders/edits avoid the per-call browser cold start.
@@ -27,18 +27,18 @@
 //     -d '{"project":"<id>","at":12.5}' -o shot.png
 //   curl -s -X POST localhost:8787/layout -H 'content-type: application/json' \
 //     -d '{"project":"<id>","at":12.5}' | jq '.items[] | select(.type=="text")'
-import http from 'node:http'
-import os from 'node:os'
-import fs from 'node:fs'
-import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import http from "node:http";
+import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   loadProjectById,
   listProjects,
   collectAddClipMedia,
   resolveMediaFile,
-} from './lib/workspace.mjs'
-import { parseArgs, chromeLaunchArgs } from './lib/cli.mjs'
+} from "./lib/workspace.mjs";
+import { parseArgs, chromeLaunchArgs } from "./lib/cli.mjs";
 import {
   assertHardwareGpuForJob,
   prepareJob,
@@ -47,16 +47,16 @@ import {
   warningsHeaderValue,
   loadJobProject,
   resolveProjectMedia,
-} from './lib/render-core.mjs'
-import { OperationQueue, OperationQueueError } from './lib/operation-queue.mjs'
-import { PageSession, probeGpu } from './lib/page-session.mjs'
+} from "./lib/render-core.mjs";
+import { OperationQueue, OperationQueueError } from "./lib/operation-queue.mjs";
+import { PageSession, probeGpu } from "./lib/page-session.mjs";
 import {
   assertSinglePathComponent,
   HttpError,
   readJsonBody,
   readJsonBodyWithBytes,
   setHttpTimeouts,
-} from './lib/http-security.mjs'
+} from "./lib/http-security.mjs";
 import {
   HEADLESS_API_VERSION,
   ContractValidationError,
@@ -71,7 +71,7 @@ import {
   projectUpdateRequestSchema,
   renderRequestSchema,
   validate,
-} from './lib/contract.mjs'
+} from "./lib/contract.mjs";
 import {
   acquireWriterLock,
   assertAtomicReplace,
@@ -83,321 +83,371 @@ import {
   listProjectResources,
   saveProjectResource,
   updateMediaMetadata,
-} from './lib/lifecycle-store.mjs'
-import { withIdempotency } from './lib/idempotency.mjs'
+} from "./lib/lifecycle-store.mjs";
+import { withIdempotency } from "./lib/idempotency.mjs";
 
-const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --build  --head  --harness-url <url>\n`
+const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --build  --head  --harness-url <url>\n`;
 const SERVE_OPTIONS = new Set([
-  'workspace',
-  'host',
-  'port',
-  'build',
-  'head',
-  'harness-url',
-  'help',
-  'render-timeout-ms',
-  'edit-timeout-ms',
-  'max-queue-depth',
-  'shutdown-timeout-ms',
-])
+  "workspace",
+  "host",
+  "port",
+  "build",
+  "head",
+  "harness-url",
+  "help",
+  "render-timeout-ms",
+  "edit-timeout-ms",
+  "max-queue-depth",
+  "shutdown-timeout-ms",
+]);
 
 /** Resolve the service bind address without exposing native runs by default. */
 export function resolveHost(args = {}, env = process.env) {
-  const host = Object.prototype.hasOwnProperty.call(args, 'host')
+  const host = Object.prototype.hasOwnProperty.call(args, "host")
     ? args.host
-    : Object.prototype.hasOwnProperty.call(env, 'FREECUT_HOST')
+    : Object.prototype.hasOwnProperty.call(env, "FREECUT_HOST")
       ? env.FREECUT_HOST
-      : '127.0.0.1'
+      : "127.0.0.1";
 
-  if (typeof host !== 'string' || host.trim() === '') {
-    throw new Error('Host must be a non-empty string (--host or FREECUT_HOST)')
+  if (typeof host !== "string" || host.trim() === "") {
+    throw new Error("Host must be a non-empty string (--host or FREECUT_HOST)");
   }
-  return host.trim()
+  return host.trim();
 }
 
 const IMAGE_MIME_BY_FORMAT = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-}
-const IMAGE_EXT_BY_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+};
+const IMAGE_EXT_BY_MIME = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
 
 /** Strip non-ASCII so a value is always a legal HTTP header (never 500s a response). */
 function asciiHeader(value) {
-  return JSON.stringify(value).replace(/[^\t\x20-\x7E]/g, ' ')
+  return JSON.stringify(value).replace(/[^\t\x20-\x7E]/g, " ");
 }
 
 function sendJson(res, status, obj) {
-  const body = JSON.stringify(obj)
-  res.writeHead(status, { 'Content-Type': 'application/json' })
-  res.end(body)
+  const body = JSON.stringify(obj);
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(body);
 }
 
 /** Heuristic: is this a software (CPU) WebGPU adapter rather than a real GPU? */
 function isSoftwareGpu(gpu) {
-  if (!gpu?.available) return true
-  const s = `${gpu.vendor} ${gpu.architecture} ${gpu.description}`.toLowerCase()
-  return /llvmpipe|lavapipe|swiftshader|software|mesa/.test(s)
+  if (!gpu?.available) return true;
+  const s =
+    `${gpu.vendor} ${gpu.architecture} ${gpu.description}`.toLowerCase();
+  return /llvmpipe|lavapipe|swiftshader|software|mesa/.test(s);
 }
 
 async function main() {
-  const { chromium } = await import('playwright')
-  const args = parseArgs(process.argv.slice(2), { allowed: SERVE_OPTIONS })
+  const { chromium } = await import("playwright");
+  const args = parseArgs(process.argv.slice(2), { allowed: SERVE_OPTIONS });
   if (args.help) {
-    console.log(HELP)
-    return
+    console.log(HELP);
+    return;
   }
-  const workspace = args.workspace
-  if (!workspace) throw new Error('Missing --workspace <dir>')
-  if (!fs.existsSync(workspace)) throw new Error(`Workspace not found: ${workspace}`)
-  const releaseWriterLock = await acquireWriterLock(workspace)
+  const workspace = args.workspace;
+  if (!workspace) throw new Error("Missing --workspace <dir>");
+  if (!fs.existsSync(workspace))
+    throw new Error(`Workspace not found: ${workspace}`);
+  const releaseWriterLock = await acquireWriterLock(workspace);
   try {
-    await assertAtomicReplace(workspace)
+    await assertAtomicReplace(workspace);
   } catch (error) {
-    await releaseWriterLock()
-    throw error
+    await releaseWriterLock();
+    throw error;
   }
-  const host = resolveHost(args)
-  const port = args.port ? Number(args.port) : 8787
+  const host = resolveHost(args);
+  const port = args.port ? Number(args.port) : 8787;
   const positiveInt = (name, fallback, { min = 1, max = 86_400_000 } = {}) => {
-    const value = args[name] === undefined ? fallback : Number(args[name])
+    const value = args[name] === undefined ? fallback : Number(args[name]);
     if (!Number.isInteger(value) || value < min || value > max) {
-      throw new Error(`--${name} must be an integer between ${min} and ${max}`)
+      throw new Error(`--${name} must be an integer between ${min} and ${max}`);
     }
-    return value
-  }
+    return value;
+  };
   if (!Number.isInteger(port) || port < 0 || port > 65535)
-    throw new Error('--port must be an integer between 0 and 65535')
-  const renderTimeoutMs = positiveInt('render-timeout-ms', 30 * 60_000)
-  const editTimeoutMs = positiveInt('edit-timeout-ms', 2 * 60_000)
-  const maxQueueDepth = positiveInt('max-queue-depth', 8, { min: 0, max: 10_000 })
-  const shutdownTimeoutMs = positiveInt('shutdown-timeout-ms', 30_000)
+    throw new Error("--port must be an integer between 0 and 65535");
+  const renderTimeoutMs = positiveInt("render-timeout-ms", 30 * 60_000);
+  const editTimeoutMs = positiveInt("edit-timeout-ms", 2 * 60_000);
+  const maxQueueDepth = positiveInt("max-queue-depth", 8, {
+    min: 0,
+    max: 10_000,
+  });
+  const shutdownTimeoutMs = positiveInt("shutdown-timeout-ms", 30_000);
 
   const { harnessUrl, mediaUrlOf, closeServers } = await startHarness({
     workspace,
-    devUrl: args['harness-url'],
+    devUrl: args["harness-url"],
     build: args.build,
-  })
+  });
 
   const browser = await chromium.launch({
-    channel: 'chrome',
+    channel: "chrome",
     headless: !args.head,
     args: chromeLaunchArgs(),
-  })
+  });
   const session = new PageSession({
     browser,
     harnessUrl,
-    onPageError: (e) => console.error('[pageerror]', e.message),
-  })
-  await session.open()
+    onPageError: (e) => console.error("[pageerror]", e.message),
+  });
+  await session.open();
 
   // Report the WebGPU adapter so it's obvious whether this is a real GPU.
-  let gpu = await probeGpu(session.page)
+  let gpu = await probeGpu(session.page);
   if (gpu.available) {
     console.log(
-      `WebGPU adapter: ${gpu.vendor || '?'} / ${gpu.architecture || gpu.description || '?'}`,
-    )
+      `WebGPU adapter: ${gpu.vendor || "?"} / ${gpu.architecture || gpu.description || "?"}`,
+    );
   }
   if (isSoftwareGpu(gpu)) {
     console.warn(
-      'WARNING: WebGPU is software (no real GPU) — GPU-effect renders are rejected. ' +
-        'Run on a Linux host with an NVIDIA GPU + Container Toolkit (--gpus all ' +
-        '-e NVIDIA_DRIVER_CAPABILITIES=all), or render natively on Windows/macOS.',
-    )
+      "WARNING: WebGPU is software (no real GPU) — GPU-effect renders are rejected. " +
+        "Run on a Linux host with an NVIDIA GPU + Container Toolkit (--gpus all " +
+        "-e NVIDIA_DRIVER_CAPABILITIES=all), or render natively on Windows/macOS.",
+    );
   }
 
   const queue = new OperationQueue({
     maxQueueDepth,
     recover: async (error) => {
-      console.error(`Recreating browser page after failed operation: ${error.message ?? error}`)
+      console.error(
+        `Recreating browser page after failed operation: ${error.message ?? error}`,
+      );
       if (!queue.accepting) {
-        await session.close()
-        return
+        await session.close();
+        return;
       }
-      await session.recreate()
-      gpu = await probeGpu(session.page)
+      await session.recreate();
+      gpu = await probeGpu(session.page);
     },
-  })
+  });
 
-  const tmpDir = path.join(os.tmpdir(), 'freecut-serve')
-  fs.mkdirSync(tmpDir, { recursive: true })
-  let counter = 0
+  const tmpDir = path.join(os.tmpdir(), "freecut-serve");
+  fs.mkdirSync(tmpDir, { recursive: true });
+  let counter = 0;
 
   const handleRender = async (req, res, { normalizeInline = false } = {}) => {
-    let body = validate(renderRequestSchema, await readJsonBody(req))
+    let body = validate(renderRequestSchema, await readJsonBody(req));
     if (normalizeInline && body.projectObject) {
-      body = { ...body, projectObject: await browserNormalize(body.projectObject) }
+      body = {
+        ...body,
+        projectObject: await browserNormalize(body.projectObject),
+      };
     }
-    if (body.project) assertSinglePathComponent(body.project, 'project id')
-    const outPath = path.join(tmpDir, `render-${process.pid}-${++counter}.out`)
-    const job = prepareJob(workspace, { ...body, out: outPath }, mediaUrlOf)
-    assertHardwareGpuForJob(job, isSoftwareGpu(gpu))
+    if (body.project) assertSinglePathComponent(body.project, "project id");
+    const outPath = path.join(tmpDir, `render-${process.pid}-${++counter}.out`);
+    const job = prepareJob(workspace, { ...body, out: outPath }, mediaUrlOf);
+    assertHardwareGpuForJob(job, isSoftwareGpu(gpu));
 
-    const t0 = Date.now()
+    const t0 = Date.now();
     const summary = await queue.enqueue(
       () => renderJob(session.page, job, { downloadTimeoutMs: 0 }),
-      { timeoutMs: renderTimeoutMs, kind: 'render' },
-    )
+      { timeoutMs: renderTimeoutMs, kind: "render" },
+    );
     console.log(
       `render ${job.project.name ?? job.project.id} -> ${summary.effectiveSettings.container} ` +
         `(${(summary.fileSize / 1e6).toFixed(2)}MB, ${summary.durationSeconds.toFixed(2)}s) in ${Date.now() - t0}ms`,
-    )
+    );
 
     res.writeHead(200, {
-      'Content-Type': summary.mimeType,
-      'Content-Length': fs.statSync(summary.outputPath).size,
-      'Content-Disposition': `attachment; filename="${summary.fileName}"`,
+      "Content-Type": summary.mimeType,
+      "Content-Length": fs.statSync(summary.outputPath).size,
+      "Content-Disposition": `attachment; filename="${summary.fileName}"`,
       // Header values must be ASCII; sanitize defensively so a warning never
       // turns a successful render into a 500.
       ...(summary.warnings?.length
-        ? { 'X-Freecut-Warnings': warningsHeaderValue(summary.warnings) }
+        ? { "X-Freecut-Warnings": warningsHeaderValue(summary.warnings) }
         : {}),
-    })
-    const stream = fs.createReadStream(summary.outputPath)
-    stream.pipe(res)
-    stream.on('close', () => fs.rm(summary.outputPath, () => {}))
-  }
+    });
+    const stream = fs.createReadStream(summary.outputPath);
+    stream.pipe(res);
+    stream.on("close", () => fs.rm(summary.outputPath, () => {}));
+  };
 
   const handleEdit = async (req, res) => {
-    const body = validate(editRequestSchema, await readJsonBody(req))
-    if (body.project) assertSinglePathComponent(body.project, 'project id')
-    const project = body.projectObject ?? loadProjectById(workspace, body.project).project
-    const ops = body.ops
-    const media = collectAddClipMedia(workspace, ops)
+    const body = validate(editRequestSchema, await readJsonBody(req));
+    if (body.project) assertSinglePathComponent(body.project, "project id");
+    const project =
+      body.projectObject ?? loadProjectById(workspace, body.project).project;
+    const ops = body.ops;
+    const media = collectAddClipMedia(workspace, ops);
     const result = await queue.enqueue(
       () =>
-        session.page.evaluate((payload) => window.freecut.editProject(payload), {
-          project,
-          ops,
-          media,
-        }),
-      { timeoutMs: editTimeoutMs, kind: 'edit' },
-    )
-    sendJson(res, 200, result)
-  }
+        session.page.evaluate(
+          (payload) => window.freecut.editProject(payload),
+          {
+            project,
+            ops,
+            media,
+          },
+        ),
+      { timeoutMs: editTimeoutMs, kind: "edit" },
+    );
+    sendJson(res, 200, result);
+  };
 
   const browserNormalize = (project) =>
     queue.enqueue(
-      () => session.page.evaluate((value) => window.freecut.normalizeProject(value), project),
-      { timeoutMs: editTimeoutMs, kind: 'project-normalize' },
-    )
+      () =>
+        session.page.evaluate(
+          (value) => window.freecut.normalizeProject(value),
+          project,
+        ),
+      { timeoutMs: editTimeoutMs, kind: "project-normalize" },
+    );
 
   const resourceEnvelope = (resource) => ({
     ok: true,
     apiVersion: HEADLESS_API_VERSION,
     ...resource,
-  })
+  });
 
   const handleV1ProjectList = async (url, res) => {
-    const limitText = url.searchParams.get('limit')
-    const limit = limitText === null ? 100 : Number(limitText)
+    const limitText = url.searchParams.get("limit");
+    const limit = limitText === null ? 100 : Number(limitText);
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000)
-      throw new HttpError(400, 'VALIDATION_ERROR', 'limit must be an integer between 1 and 1000')
-    let offset = 0
-    const cursor = url.searchParams.get('cursor')
+      throw new HttpError(
+        400,
+        "VALIDATION_ERROR",
+        "limit must be an integer between 1 and 1000",
+      );
+    let offset = 0;
+    const cursor = url.searchParams.get("cursor");
     if (cursor) {
       try {
-        const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))
-        if (!Number.isInteger(decoded.offset) || decoded.offset < 0) throw new Error('invalid')
-        offset = decoded.offset
+        const decoded = JSON.parse(
+          Buffer.from(cursor, "base64url").toString("utf8"),
+        );
+        if (!Number.isInteger(decoded.offset) || decoded.offset < 0)
+          throw new Error("invalid");
+        offset = decoded.offset;
       } catch {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'cursor is invalid')
+        throw new HttpError(400, "VALIDATION_ERROR", "cursor is invalid");
       }
     }
-    const all = await listProjectResources(workspace)
-    const projects = all.slice(offset, offset + limit)
-    const nextOffset = offset + projects.length
+    const all = await listProjectResources(workspace);
+    const projects = all.slice(offset, offset + limit);
+    const nextOffset = offset + projects.length;
     const nextCursor =
       nextOffset < all.length
-        ? Buffer.from(JSON.stringify({ offset: nextOffset })).toString('base64url')
-        : null
+        ? Buffer.from(JSON.stringify({ offset: nextOffset })).toString(
+            "base64url",
+          )
+        : null;
     sendJson(res, 200, {
       ok: true,
       apiVersion: HEADLESS_API_VERSION,
       projects,
       nextCursor,
-    })
-  }
+    });
+  };
 
   const handleV1ProjectCreate = async (req, res) => {
-    const { value: raw, rawBytes } = await readJsonBodyWithBytes(req, { maxBytes: 1024 * 1024 })
-    const body = validate(projectCreateRequestSchema, raw)
-    const route = '/v1/projects'
+    const { value: raw, rawBytes } = await readJsonBodyWithBytes(req, {
+      maxBytes: 1024 * 1024,
+    });
+    const body = validate(projectCreateRequestSchema, raw);
+    const route = "/v1/projects";
     const result = await withIdempotency(
       workspace,
       {
-        key: req.headers['idempotency-key'],
-        method: 'POST',
+        key: req.headers["idempotency-key"],
+        method: "POST",
         route,
         requestBytes: rawBytes,
       },
       async () => {
         const project = await queue.enqueue(
-          () => session.page.evaluate((value) => window.freecut.createProject(value), body),
-          { timeoutMs: editTimeoutMs, kind: 'project-create' },
-        )
-        const resource = await createProjectResource(workspace, project)
-        return { status: 201, response: resourceEnvelope(resource) }
+          () =>
+            session.page.evaluate(
+              (value) => window.freecut.createProject(value),
+              body,
+            ),
+          { timeoutMs: editTimeoutMs, kind: "project-create" },
+        );
+        const resource = await createProjectResource(workspace, project);
+        return { status: 201, response: resourceEnvelope(resource) };
       },
-    )
-    if (result.replayed) res.setHeader('Idempotency-Replayed', 'true')
-    sendJson(res, result.status, result.response)
-  }
+    );
+    if (result.replayed) res.setHeader("Idempotency-Replayed", "true");
+    sendJson(res, result.status, result.response);
+  };
 
   const handleV1ProjectSave = async (req, res, id) => {
     const body = validate(
       projectSaveRequestSchema,
       await readJsonBody(req, { maxBytes: 16 * 1024 * 1024 }),
-    )
+    );
     if (body.project.id !== undefined && body.project.id !== id)
-      throw new HttpError(400, 'PROJECT_ID_MISMATCH', 'Project body id must equal the path id')
-    const project = await browserNormalize({ ...body.project, id })
-    const resource = await saveProjectResource(workspace, id, project, body)
-    sendJson(res, 200, resourceEnvelope(resource))
-  }
+      throw new HttpError(
+        400,
+        "PROJECT_ID_MISMATCH",
+        "Project body id must equal the path id",
+      );
+    const project = await browserNormalize({ ...body.project, id });
+    const resource = await saveProjectResource(workspace, id, project, body);
+    sendJson(res, 200, resourceEnvelope(resource));
+  };
 
   const handleV1ProjectUpdate = async (req, res, id) => {
     const body = validate(
       projectUpdateRequestSchema,
       await readJsonBody(req, { maxBytes: 1024 * 1024 }),
-    )
-    const current = await getProjectResource(workspace, id)
+    );
+    const current = await getProjectResource(workspace, id);
     const project = await browserNormalize({
       ...current.project,
       ...(body.updates.name !== undefined ? { name: body.updates.name } : {}),
-      ...(body.updates.description !== undefined ? { description: body.updates.description } : {}),
+      ...(body.updates.description !== undefined
+        ? { description: body.updates.description }
+        : {}),
       metadata: {
         ...current.project.metadata,
-        ...(body.updates.width !== undefined ? { width: body.updates.width } : {}),
-        ...(body.updates.height !== undefined ? { height: body.updates.height } : {}),
+        ...(body.updates.width !== undefined
+          ? { width: body.updates.width }
+          : {}),
+        ...(body.updates.height !== undefined
+          ? { height: body.updates.height }
+          : {}),
         ...(body.updates.fps !== undefined ? { fps: body.updates.fps } : {}),
         ...(body.updates.backgroundColor !== undefined
           ? { backgroundColor: body.updates.backgroundColor }
           : {}),
       },
-    })
-    const resource = await saveProjectResource(workspace, id, project, body)
-    sendJson(res, 200, resourceEnvelope(resource))
-  }
+    });
+    const resource = await saveProjectResource(workspace, id, project, body);
+    sendJson(res, 200, resourceEnvelope(resource));
+  };
 
   const handleV1ProjectEdit = async (req, res, id) => {
     const { value: raw, rawBytes } = await readJsonBodyWithBytes(req, {
       maxBytes: 16 * 1024 * 1024,
-    })
-    const body = validate(lifecycleEditRequestSchema, raw)
+    });
+    const body = validate(lifecycleEditRequestSchema, raw);
     const execute = async () => {
-      const current = await getProjectResource(workspace, id)
-      const media = collectAddClipMedia(workspace, body.ops)
+      const current = await getProjectResource(workspace, id);
+      const media = collectAddClipMedia(workspace, body.ops);
       const result = await queue.enqueue(
         () =>
-          session.page.evaluate((payload) => window.freecut.editProject(payload), {
-            project: current.project,
-            ops: body.ops,
-            media,
-          }),
-        { timeoutMs: editTimeoutMs, kind: 'edit' },
-      )
+          session.page.evaluate(
+            (payload) => window.freecut.editProject(payload),
+            {
+              project: current.project,
+              ops: body.ops,
+              media,
+            },
+          ),
+        { timeoutMs: editTimeoutMs, kind: "edit" },
+      );
       if (!body.persist)
         return {
           status: 200,
@@ -407,9 +457,9 @@ async function main() {
             persisted: false,
             baseRevision: current.revision,
           },
-        }
-      const project = await browserNormalize(result.project)
-      const resource = await saveProjectResource(workspace, id, project, body)
+        };
+      const project = await browserNormalize(result.project);
+      const resource = await saveProjectResource(workspace, id, project, body);
       return {
         status: 200,
         response: {
@@ -420,35 +470,36 @@ async function main() {
           revision: resource.revision,
           warnings: resource.warnings,
         },
-      }
-    }
+      };
+    };
     if (!body.persist) {
-      const result = await execute()
-      sendJson(res, result.status, result.response)
-      return
+      const result = await execute();
+      sendJson(res, result.status, result.response);
+      return;
     }
     const result = await withIdempotency(
       workspace,
       {
-        key: req.headers['idempotency-key'],
-        method: 'POST',
+        key: req.headers["idempotency-key"],
+        method: "POST",
         route: `/v1/projects/${id}/edit`,
         requestBytes: rawBytes,
       },
       execute,
-    )
-    if (result.replayed) res.setHeader('Idempotency-Replayed', 'true')
-    sendJson(res, result.status, result.response)
-  }
+    );
+    if (result.replayed) res.setHeader("Idempotency-Replayed", "true");
+    sendJson(res, result.status, result.response);
+  };
 
   const handleV1MediaProbe = async (req, res, id) => {
     const body = validate(
       mediaProbeRequestSchema,
       await readJsonBody(req, { maxBytes: 1024 * 1024 }),
-    )
-    const current = await getMediaResource(workspace, id)
-    const source = resolveMediaFile(workspace, id)
-    if (!source) throw new HttpError(422, 'MISSING_MEDIA', 'Media source file is missing')
+    );
+    const current = await getMediaResource(workspace, id);
+    const source = resolveMediaFile(workspace, id);
+    if (!source)
+      throw new HttpError(422, "MISSING_MEDIA", "Media source file is missing");
     const probe = await queue.enqueue(
       () =>
         session.page.evaluate((payload) => window.freecut.probeMedia(payload), {
@@ -456,8 +507,8 @@ async function main() {
           fileName: path.basename(source),
           mimeType: current.metadata.mimeType,
         }),
-      { timeoutMs: editTimeoutMs, kind: 'media-probe' },
-    )
+      { timeoutMs: editTimeoutMs, kind: "media-probe" },
+    );
     if (!body.persist) {
       sendJson(res, 200, {
         ok: true,
@@ -465,10 +516,10 @@ async function main() {
         mediaId: id,
         probe,
         persisted: false,
-      })
-      return
+      });
+      return;
     }
-    const saved = await updateMediaMetadata(workspace, id, probe, body)
+    const saved = await updateMediaMetadata(workspace, id, probe, body);
     sendJson(res, 200, {
       ok: true,
       apiVersion: HEADLESS_API_VERSION,
@@ -476,74 +527,88 @@ async function main() {
       probe,
       persisted: true,
       revision: saved.revision,
-    })
-  }
+    });
+  };
 
   // Grab a single composited frame (default: full-res PNG) — no encoder/muxer,
   // much faster than /render + extract for eyeballing a position on a warm page.
   // Warm-service frame endpoint; exercised end-to-end by headless/test.mjs
   // fallow-ignore-next-line complexity
   const handleFrame = async (req, res) => {
-    const body = validate(frameRequestSchema, await readJsonBody(req))
-    if (body.project) assertSinglePathComponent(body.project, 'project id')
+    const body = validate(frameRequestSchema, await readJsonBody(req));
+    if (body.project) assertSinglePathComponent(body.project, "project id");
     const project =
-      body.projectObject ?? loadJobProject(workspace, { project: body.project }).project
-    const { media, missing } = resolveProjectMedia(workspace, project, mediaUrlOf, null)
-    const format = (body.format ?? 'png').toLowerCase()
-    const mime = IMAGE_MIME_BY_FORMAT[format]
+      body.projectObject ??
+      loadJobProject(workspace, { project: body.project }).project;
+    const { media, missing } = resolveProjectMedia(
+      workspace,
+      project,
+      mediaUrlOf,
+      null,
+    );
+    const format = (body.format ?? "png").toLowerCase();
+    const mime = IMAGE_MIME_BY_FORMAT[format];
     const outPath = path.join(
       tmpDir,
       `frame-${process.pid}-${++counter}.${IMAGE_EXT_BY_MIME[mime]}`,
-    )
+    );
 
-    const t0 = Date.now()
+    const t0 = Date.now();
     const summary = await queue.enqueue(
       async () => {
-        const downloadPromise = session.page.waitForEvent('download', { timeout: 5 * 60_000 })
-        downloadPromise.catch(() => {})
-        const s = await session.page.evaluate((payload) => window.freecut.renderFrame(payload), {
-          project,
-          media,
-          frame: body.frame,
-          atSeconds: body.at ?? body.atSeconds,
-          width: body.width,
-          height: body.height,
-          format: mime,
-          quality: body.quality,
-        })
-        const download = await downloadPromise
-        await download.saveAs(outPath)
-        return s
+        const downloadPromise = session.page.waitForEvent("download", {
+          timeout: 5 * 60_000,
+        });
+        downloadPromise.catch(() => {});
+        const s = await session.page.evaluate(
+          (payload) => window.freecut.renderFrame(payload),
+          {
+            project,
+            media,
+            frame: body.frame,
+            atSeconds: body.at ?? body.atSeconds,
+            width: body.width,
+            height: body.height,
+            format: mime,
+            quality: body.quality,
+          },
+        );
+        const download = await downloadPromise;
+        await download.saveAs(outPath);
+        return s;
       },
-      { timeoutMs: renderTimeoutMs, kind: 'frame' },
-    )
+      { timeoutMs: renderTimeoutMs, kind: "frame" },
+    );
     console.log(
       `frame ${project.name ?? project.id} @${summary.frame} (${summary.atSeconds.toFixed(3)}s) -> ` +
         `${summary.width}x${summary.height} ${IMAGE_EXT_BY_MIME[mime]} ` +
         `(${(summary.fileSize / 1000).toFixed(1)}KB) in ${Date.now() - t0}ms`,
-    )
+    );
 
     res.writeHead(200, {
-      'Content-Type': mime,
-      'Content-Length': fs.statSync(outPath).size,
-      'Content-Disposition': `attachment; filename="${path.basename(outPath)}"`,
-      'X-Freecut-Frame': String(summary.frame),
-      ...(missing.length ? { 'X-Freecut-Missing-Media': asciiHeader(missing) } : {}),
-    })
-    const stream = fs.createReadStream(outPath)
-    stream.pipe(res)
-    stream.on('close', () => fs.rm(outPath, () => {}))
-  }
+      "Content-Type": mime,
+      "Content-Length": fs.statSync(outPath).size,
+      "Content-Disposition": `attachment; filename="${path.basename(outPath)}"`,
+      "X-Freecut-Frame": String(summary.frame),
+      ...(missing.length
+        ? { "X-Freecut-Missing-Media": asciiHeader(missing) }
+        : {}),
+    });
+    const stream = fs.createReadStream(outPath);
+    stream.pipe(res);
+    stream.on("close", () => fs.rm(outPath, () => {}));
+  };
 
   // Dump computed on-canvas bounding boxes at a frame (no render/GPU) — trust
   // coordinates without a render round-trip.
   const handleLayout = async (req, res) => {
-    const body = validate(layoutRequestSchema, await readJsonBody(req))
-    if (body.project) assertSinglePathComponent(body.project, 'project id')
+    const body = validate(layoutRequestSchema, await readJsonBody(req));
+    if (body.project) assertSinglePathComponent(body.project, "project id");
     const project =
-      body.projectObject ?? loadJobProject(workspace, { project: body.project }).project
+      body.projectObject ??
+      loadJobProject(workspace, { project: body.project }).project;
     // Only metadata (source dimensions) is used; media URLs are never fetched.
-    const { media } = resolveProjectMedia(workspace, project, mediaUrlOf, null)
+    const { media } = resolveProjectMedia(workspace, project, mediaUrlOf, null);
     const layout = await queue.enqueue(
       () =>
         session.page.evaluate((payload) => window.freecut.dumpLayout(payload), {
@@ -552,24 +617,29 @@ async function main() {
           frame: body.frame,
           atSeconds: body.at ?? body.atSeconds,
         }),
-      { timeoutMs: editTimeoutMs, kind: 'layout' },
-    )
-    sendJson(res, 200, layout)
-  }
+      { timeoutMs: editTimeoutMs, kind: "layout" },
+    );
+    sendJson(res, 200, layout);
+  };
 
   const server = http.createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const route = `${req.method} ${url.pathname}`
-    const projectMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)
-    const projectEditMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/edit$/.exec(
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const route = `${req.method} ${url.pathname}`;
+    const projectMatch =
+      /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname);
+    const projectEditMatch =
+      /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/edit$/.exec(
+        url.pathname,
+      );
+    const mediaMatch = /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(
       url.pathname,
-    )
-    const mediaMatch = /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)
-    const mediaProbeMatch = /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/probe$/.exec(
-      url.pathname,
-    )
+    );
+    const mediaProbeMatch =
+      /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/probe$/.exec(
+        url.pathname,
+      );
     const handler =
-      route === 'GET /health'
+      route === "GET /health"
         ? async () => {
             sendJson(res, 200, {
               ok: true,
@@ -577,24 +647,24 @@ async function main() {
               gpu,
               software: isSoftwareGpu(gpu),
               harnessUrl,
-            })
+            });
           }
-        : route === 'GET /capabilities'
+        : route === "GET /capabilities"
           ? async () => sendJson(res, 200, capabilities())
-          : route === 'GET /v1/capabilities'
+          : route === "GET /v1/capabilities"
             ? async () => sendJson(res, 200, { ok: true, ...capabilities() })
-            : route === 'POST /v1/projects'
+            : route === "POST /v1/projects"
               ? () => handleV1ProjectCreate(req, res)
-              : route === 'GET /v1/projects'
+              : route === "GET /v1/projects"
                 ? () => handleV1ProjectList(url, res)
-                : projectEditMatch && req.method === 'POST'
+                : projectEditMatch && req.method === "POST"
                   ? () =>
                       handleV1ProjectEdit(
                         req,
                         res,
-                        assertPortableId(projectEditMatch[1], 'project id'),
+                        assertPortableId(projectEditMatch[1], "project id"),
                       )
-                  : projectMatch && req.method === 'GET'
+                  : projectMatch && req.method === "GET"
                     ? async () =>
                         sendJson(
                           res,
@@ -602,39 +672,42 @@ async function main() {
                           resourceEnvelope(
                             await getProjectResource(
                               workspace,
-                              assertPortableId(projectMatch[1], 'project id'),
+                              assertPortableId(projectMatch[1], "project id"),
                             ),
                           ),
                         )
-                    : projectMatch && req.method === 'PUT'
+                    : projectMatch && req.method === "PUT"
                       ? () =>
                           handleV1ProjectSave(
                             req,
                             res,
-                            assertPortableId(projectMatch[1], 'project id'),
+                            assertPortableId(projectMatch[1], "project id"),
                           )
-                      : projectMatch && req.method === 'PATCH'
+                      : projectMatch && req.method === "PATCH"
                         ? () =>
                             handleV1ProjectUpdate(
                               req,
                               res,
-                              assertPortableId(projectMatch[1], 'project id'),
+                              assertPortableId(projectMatch[1], "project id"),
                             )
-                        : route === 'GET /v1/media'
+                        : route === "GET /v1/media"
                           ? async () =>
                               sendJson(res, 200, {
                                 ok: true,
                                 apiVersion: HEADLESS_API_VERSION,
                                 media: await listMediaResources(workspace),
                               })
-                          : mediaProbeMatch && req.method === 'POST'
+                          : mediaProbeMatch && req.method === "POST"
                             ? () =>
                                 handleV1MediaProbe(
                                   req,
                                   res,
-                                  assertPortableId(mediaProbeMatch[1], 'media id'),
+                                  assertPortableId(
+                                    mediaProbeMatch[1],
+                                    "media id",
+                                  ),
                                 )
-                            : mediaMatch && req.method === 'GET'
+                            : mediaMatch && req.method === "GET"
                               ? async () =>
                                   sendJson(
                                     res,
@@ -642,105 +715,127 @@ async function main() {
                                     resourceEnvelope(
                                       await getMediaResource(
                                         workspace,
-                                        assertPortableId(mediaMatch[1], 'media id'),
+                                        assertPortableId(
+                                          mediaMatch[1],
+                                          "media id",
+                                        ),
                                       ),
                                     ),
                                   )
-                              : route === 'POST /v1/render'
-                                ? () => handleRender(req, res, { normalizeInline: true })
-                                : route === 'GET /projects'
-                                  ? async () => sendJson(res, 200, listProjects(workspace))
-                                  : route === 'POST /render'
+                              : route === "POST /v1/render"
+                                ? () =>
+                                    handleRender(req, res, {
+                                      normalizeInline: true,
+                                    })
+                                : route === "GET /projects"
+                                  ? async () =>
+                                      sendJson(
+                                        res,
+                                        200,
+                                        listProjects(workspace),
+                                      )
+                                  : route === "POST /render"
                                     ? () => handleRender(req, res)
-                                    : route === 'POST /edit'
+                                    : route === "POST /edit"
                                       ? () => handleEdit(req, res)
-                                      : route === 'POST /frame'
+                                      : route === "POST /frame"
                                         ? () => handleFrame(req, res)
-                                        : route === 'POST /layout'
+                                        : route === "POST /layout"
                                           ? () => handleLayout(req, res)
-                                          : null
+                                          : null;
     if (!handler) {
-      sendJson(res, 404, { error: `No route: ${route}` })
-      return
+      sendJson(res, 404, { error: `No route: ${route}` });
+      return;
     }
     handler().catch((e) => {
-      console.error(`${route} failed:`, e.message ?? e)
+      console.error(`${route} failed:`, e.message ?? e);
       if (!res.headersSent) {
-        const validation = e instanceof ContractValidationError
-        const missingMedia = e.code === 'MISSING_MEDIA'
+        const validation = e instanceof ContractValidationError;
+        const missingMedia = e.code === "MISSING_MEDIA";
         const status = validation
           ? 400
           : missingMedia
             ? 422
             : e instanceof OperationQueueError || e instanceof HttpError
               ? e.statusCode
-              : 500
-        if (status === 413 || status === 408) res.setHeader('Connection', 'close')
-        if (status === 413 || status === 408) res.once('finish', () => req.destroy())
+              : 500;
+        if (status === 413 || status === 408)
+          res.setHeader("Connection", "close");
+        if (status === 413 || status === 408)
+          res.once("finish", () => req.destroy());
         sendJson(res, status, {
           ok: false,
           apiVersion: HEADLESS_API_VERSION,
           error: {
-            code: validation ? (e.code ?? 'INVALID_JSON') : (e.code ?? 'INTERNAL_ERROR'),
+            code: validation
+              ? (e.code ?? "INVALID_JSON")
+              : (e.code ?? "INTERNAL_ERROR"),
             message:
               validation ||
               missingMedia ||
               e instanceof OperationQueueError ||
               e instanceof HttpError
                 ? e.message
-                : 'Internal server error',
+                : "Internal server error",
             fields: e.fields ?? [],
             ...(missingMedia ? { mediaIds: e.mediaIds } : {}),
             apiVersion: HEADLESS_API_VERSION,
-            ...(e.expectedRevision ? { expectedRevision: e.expectedRevision } : {}),
+            ...(e.expectedRevision
+              ? { expectedRevision: e.expectedRevision }
+              : {}),
             ...(e.actualRevision ? { actualRevision: e.actualRevision } : {}),
           },
-        })
-      } else res.destroy()
-    })
-  })
-  setHttpTimeouts(server)
+        });
+      } else res.destroy();
+    });
+  });
+  setHttpTimeouts(server);
 
   // The default remains loopback-only because the render service has no auth.
   // Network exposure must be an explicit CLI/environment configuration choice.
-  await new Promise((resolve) => server.listen(port, host, resolve))
-  console.log(`FreeCut render service on http://${host}:${port}  (workspace: ${workspace})`)
+  await new Promise((resolve) => server.listen(port, host, resolve));
+  console.log(
+    `FreeVideoEditor render service on http://${host}:${port}  (workspace: ${workspace})`,
+  );
   console.log(
     `  GET /health  GET /capabilities  GET /projects  POST /render  POST /edit  POST /frame  POST /layout`,
-  )
+  );
 
-  let shuttingDown
+  let shuttingDown;
   const shutdown = () =>
     (shuttingDown ??= (async () => {
-      console.log('\nShutting down...')
-      const serverClosed = new Promise((resolve) => server.close(resolve))
+      console.log("\nShutting down...");
+      const serverClosed = new Promise((resolve) => server.close(resolve));
       try {
-        await queue.shutdown(shutdownTimeoutMs)
+        await queue.shutdown(shutdownTimeoutMs);
       } catch (error) {
-        console.error(error.message)
+        console.error(error.message);
       } finally {
-        await session.close()
-        await browser.close()
-        await closeServers()
-        await releaseWriterLock()
-        let closeTimer
+        await session.close();
+        await browser.close();
+        await closeServers();
+        await releaseWriterLock();
+        let closeTimer;
         const closed = await Promise.race([
           serverClosed.then(() => true),
           new Promise((resolve) => {
-            closeTimer = setTimeout(() => resolve(false), shutdownTimeoutMs)
+            closeTimer = setTimeout(() => resolve(false), shutdownTimeoutMs);
           }),
-        ])
-        clearTimeout(closeTimer)
-        if (!closed) server.closeAllConnections?.()
+        ]);
+        clearTimeout(closeTimer);
+        if (!closed) server.closeAllConnections?.();
       }
-    })())
-  process.on('SIGINT', shutdown)
-  process.on('SIGTERM', shutdown)
+    })());
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+) {
   main().catch((e) => {
-    console.error('\nService failed to start:', e.message ?? e)
-    process.exit(1)
-  })
+    console.error("\nService failed to start:", e.message ?? e);
+    process.exit(1);
+  });
 }

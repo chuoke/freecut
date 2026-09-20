@@ -129,7 +129,7 @@ export function useCaptionDialogState({
         if (!granted) {
           mediaStore.showNotification?.({
             type: 'error',
-            message: `FreeCut needs permission to read "${mediaForItem.fileName}" before extracting subtitles.`,
+            message: `FreeVideoEditor needs permission to read "${mediaForItem.fileName}" before extracting subtitles.`,
           })
           return
         }
@@ -142,7 +142,7 @@ export function useCaptionDialogState({
       if (!blob) {
         mediaStore.showNotification?.({
           type: 'error',
-          message: `FreeCut could not load "${mediaForItem.fileName}".`,
+          message: `FreeVideoEditor could not load "${mediaForItem.fileName}".`,
         })
         return
       }
