@@ -5,6 +5,11 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="FreeVideoEditor is a free browser-based video editor. Edit videos, work with timelines and effects, and export your projects with no installation required."
+    />
+    <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#111827" />
     <meta name="application-name" content="FreeVideoEditor" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -14,6 +19,19 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FreeVideoEditor" />
+    <meta property="og:title" content="Free Video Editor — Edit in Your Browser" />
+    <meta
+      property="og:description"
+      content="Professional video editing in your browser, with no installation required."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Free Video Editor — Edit in Your Browser" />
+    <meta
+      name="twitter:description"
+      content="Professional video editing in your browser, with no installation required."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,10 +39,28 @@
       rel="stylesheet"
       crossorigin="anonymous"
     />
-    <title>FreeVideoEditor</title>
+    <title>Free Video Editing Online Software | FreeVideoEditor</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>Free Video Editor</h1>
+        <p>
+          FreeVideoEditor is a free video editor that runs in your browser. Edit video on a
+          timeline, add effects, adjust audio, and export your projects without installing
+          desktop software.
+        </p>
+        <p>
+          Your workspace and media stay under your control on your device. Use a Chromium-based
+          browser for the best editing experience.
+        </p>
+        <nav aria-label="FreeVideoEditor links">
+          <a href="/projects">Open the editor</a>
+          <a href="/docs">Read the documentation</a>
+        </nav>
+      </main>
+    </noscript>
     <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
